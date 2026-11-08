@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-11-08T19:38:12Z",
+  "hardware": {
+    "os": "Windows 10",
+    "architecture": "AMD64",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python_version": "3.11.9"
+  },
+  "configuration": {
+    "total_requests": 200,
+    "concurrency": 20,
+    "domain_pack": "it_ticket_triage",
+    "llm_provider": "MockLLM (near-zero latency platform overhead test)",
+    "excludes_real_llm_latency": true
+  },
+  "metrics": {
+    "total_requests": 200,
+    "successful_requests": 200,
+    "failed_requests": 0,
+    "error_rate_percent": 0.0,
+    "total_duration_seconds": 2.721,
+    "throughput_req_per_sec": 73.49,
+    "latency_ms": {
+      "min": 99.44,
+      "mean": 249.49,
+      "p50": 249.02,
+      "p95": 372.56,
+      "p99": 385.33,
+      "max": 386.54
+    }
+  }
+}

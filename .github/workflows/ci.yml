@@ -1,0 +1,73 @@
+name: Enterprise Agent Platform CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff pytest pytest-asyncio pytest-mock httpx
+          pip install -r orchestrator/requirements.txt
+          pip install -r verifier/requirements.txt
+
+      - name: Lint with Ruff
+        run: |
+          ruff check .
+
+      - name: Execute Orchestrator and Verifier Test Suites
+        run: |
+          python scripts/run_tests.py
+
+      - name: Run AI Code Verification Quality Gate
+        run: |
+          python scripts/verify_gate.py
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: |
+          npm ci
+
+      - name: Run Frontend Vitest Component Tests
+        working-directory: frontend
+        run: |
+          npm test
+
+      - name: Build Frontend Production Bundle
+        working-directory: frontend
+        run: |
+          npm run build
+
+  docker-compose-build:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose Configuration and Build Images
+        run: |
+          docker compose config
+          docker compose build
