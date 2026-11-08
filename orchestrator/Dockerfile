@@ -11,10 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY orchestrator/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app/ ./app/
+COPY orchestrator/app/ ./app/
 COPY domain_packs/ ./domain_packs/
 
 EXPOSE 8000

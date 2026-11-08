@@ -1,0 +1,105 @@
+version: "3.8"
+
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"  # Jaeger Web UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+    networks:
+      - platform-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:16686/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  verifier:
+    build:
+      context: .
+      dockerfile: verifier/Dockerfile
+    container_name: verifier-service
+    ports:
+      - "8001:8001"
+    environment:
+      - ENVIRONMENT=production
+      - VERIFIER_HOST=0.0.0.0
+      - VERIFIER_PORT=8001
+      - OTEL_SERVICE_NAME=verifier-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+    networks:
+      - platform-net
+    depends_on:
+      jaeger:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  orchestrator:
+    build:
+      context: .
+      dockerfile: orchestrator/Dockerfile
+    container_name: orchestrator-service
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - ORCHESTRATOR_HOST=0.0.0.0
+      - ORCHESTRATOR_PORT=8000
+      - VERIFIER_URL=http://verifier:8001
+      - DOMAIN_PACKS_DIR=/app/domain_packs
+      - DATA_DIR=/app/data
+      - LLM_PROVIDER=mock
+      - LLM_MODEL=mock-agent-v1
+      - LLM_MOCK_LATENCY=0.001
+      - OTEL_SERVICE_NAME=orchestrator-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - JAEGER_UI_URL=http://localhost:16686
+    volumes:
+      - ./domain_packs:/app/domain_packs:ro
+      - orchestrator_data:/app/data
+    networks:
+      - platform-net
+    depends_on:
+      jaeger:
+        condition: service_healthy
+      verifier:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend-service
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_JAEGER_URL=http://localhost:16686
+    networks:
+      - platform-net
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+
+volumes:
+  orchestrator_data:
+
+networks:
+  platform-net:
+    driver: bridge
