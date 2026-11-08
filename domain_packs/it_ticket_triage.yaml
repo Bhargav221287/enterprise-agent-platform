@@ -1,0 +1,62 @@
+name: it_ticket_triage
+version: 1.0.0
+description: "IT ticket classification, diagnostic code generation, resolution drafting, and safety review with human escalation."
+default_confidence_threshold: 0.75
+entry_agent: classifier
+
+confidence_thresholds:
+  classifier: 0.70
+  resolver: 0.75
+  reviewer: 0.80
+
+agents:
+  - name: classifier
+    role: "Incident Categorization & Urgency Analysis"
+    system_prompt: >
+      You are an IT Support Classifier. Analyze the user ticket, determine category
+      (Access, Hardware, Software/Bug, Network), assign urgency (Low, Medium, High, Critical),
+      and search knowledge base articles using search_kb.
+    allowed_tools:
+      - search_kb
+      - lookup_record
+
+  - name: resolver
+    role: "Technical Remediation & Bug Reproduction"
+    system_prompt: >
+      You are an IT Incident Resolver. Use ticket details and KB articles to formulate
+      a resolution or fix. If diagnosing a Software/Bug ticket requiring a diagnostic or
+      reproduction script, call generate_code to safely build and verify Python code.
+      Save key incident findings to session memory using memory_write.
+    allowed_tools:
+      - search_kb
+      - generate_code
+      - memory_write
+      - memory_read
+
+  - name: reviewer
+    role: "Quality Assurance & Safety Gatekeeper"
+    system_prompt: >
+      You are an IT Quality Reviewer. Validate the resolver's proposed action, ensure
+      safety policies are met, evaluate confidence, and produce the final customer response.
+    allowed_tools:
+      - calculate
+      - memory_read
+
+routing_rules:
+  - from_agent: classifier
+    condition_type: default
+    to_agent: resolver
+  - from_agent: resolver
+    condition_type: default
+    to_agent: reviewer
+  - from_agent: reviewer
+    condition_type: default
+    to_agent: END
+
+escalation_rules:
+  - condition: "urgency == 'Critical' or 'security' in category.lower()"
+    reason: "Critical urgency or security incidents require human technician sign-off."
+    auto_escalate: true
+  - condition: "confidence < threshold"
+    reason: "Reviewer confidence is below domain safety threshold."
+    auto_escalate: true

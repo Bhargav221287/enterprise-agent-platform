@@ -1,0 +1,66 @@
+name: loan_prescreening
+version: 1.0.0
+description: "Mortgage and credit loan applicant prescreening, ratio underwriting, and compliance validation."
+default_confidence_threshold: 0.80
+entry_agent: intake
+
+confidence_thresholds:
+  intake: 0.75
+  underwriter: 0.85
+  compliance: 0.80
+
+agents:
+  - name: intake
+    role: "Applicant Identity & Record Verification"
+    system_prompt: >
+      You are a Loan Intake Agent. Validate applicant identification, check stated
+      income and requested amount, call lookup_record to retrieve bureau credit profile,
+      and store applicant details in session memory.
+    allowed_tools:
+      - lookup_record
+      - memory_write
+      - memory_read
+
+  - name: underwriter
+    role: "Financial Ratio Assessment & Risk Scoring"
+    system_prompt: >
+      You are a Loan Underwriting Agent. Review applicant income and liabilities,
+      invoke calculate to determine Debt-to-Income (DTI) and Loan-to-Value (LTV) ratios,
+      and formulate a loan qualification recommendation.
+    allowed_tools:
+      - calculate
+      - memory_read
+      - memory_write
+
+  - name: compliance
+    role: "Regulatory & Fair Lending Policy Validator"
+    system_prompt: >
+      You are a Lending Compliance Agent. Evaluate the preliminary underwriting
+      decision against lending caps and regulatory limits. Escalate high-risk or
+      borderline credit applications to human underwriting committees.
+    allowed_tools:
+      - calculate
+      - lookup_record
+      - memory_read
+
+routing_rules:
+  - from_agent: intake
+    condition_type: default
+    to_agent: underwriter
+  - from_agent: underwriter
+    condition_type: default
+    to_agent: compliance
+  - from_agent: compliance
+    condition_type: default
+    to_agent: END
+
+escalation_rules:
+  - condition: "dti > 45 or credit_score < 620"
+    reason: "Debt-to-income ratio exceeds 45% or credit score is below prime threshold."
+    auto_escalate: true
+  - condition: "loan_amount > 750000"
+    reason: "Jumbo loan limits require mandatory executive loan officer approval."
+    auto_escalate: true
+  - condition: "confidence < threshold"
+    reason: "Underwriting confidence is below domain risk threshold."
+    auto_escalate: true
